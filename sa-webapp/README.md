@@ -2,14 +2,14 @@
 ` $ mvn install`
 
 ## Running the application
-` $ java -jar sentiment-analysis-web-0.0.1-SNAPSHOT.jar --sa.logic.api.url=http://localhost:5000 ` 
+` $ java -jar target/sentiment-analysis-web-0.0.1-SNAPSHOT.jar --sa.logic.api.url=http://localhost:5000 ` 
 
 ## Building the container
-` $ docker build -f Dockerfile -t $DOCKER_USER_ID/sentiment-analysis-web-app . `
+` $ docker build -f Dockerfile -t sa-webapp . `
 
 ## Running the container
 ``` 
-$ docker run -d -p 8080:8080 -e SA_LOGIC_API_URL='http://<container_ip or docker machine ip>:5000' $DOCKER_USER_ID/sentiment-analysis-web-app  
+$ docker run -d -p 8080:8080 -e SA_LOGIC_API_URL='http://<container_ip or docker machine ip>:5000' sa-webapp  
 ```
 
 #### Native docker support needs the Container IP
@@ -29,9 +29,3 @@ Get Docker Machine IP by executing:
 ` $ docker-machine ip `
 
 Use this one in the command.
-
-
-## Pushing the container
-` $ docker push $DOCKER_USER_ID/sentiment-analysis-web-app `
-
-
