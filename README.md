@@ -137,3 +137,5 @@ Verify your cluster
     kubernetes   ClusterIP   xx.xx.xx.xx    <none>        443/TCP   41h
 
 
+### Deploy a Pod
+
