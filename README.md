@@ -121,4 +121,19 @@ Deployment steps we will proceed include:
 
 Since we will use EKS to deploy Kubernetes so you should have one with administration access. You also need fork the repo so you can have Github access token to setup CI/CD later. This part only focuses on deploy locally so having an ubuntu OS is enough !
 
-* 
+* Install [docker](https://docs.docker.com/install/linux/docker-ce/ubuntu/) and [docker-compose](https://docs.docker.com/compose/install/)(optional)
+* Install [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
+* Install [microk8s](https://microk8s.io/#get-started)
+
+Verify your cluster
+
+    engineer@engineer-PC:~$ microk8s.kubectl get nodes
+    NAME          STATUS   ROLES    AGE   VERSION
+    engineer-pc   Ready    <none>   41h   v1.17.2
+    engineer@engineer-PC:~$ microk8s.kubectl get pods
+    No resources found in default namespace.
+    engineer@engineer-PC:~$ microk8s.kubectl get services
+    NAME         TYPE        CLUSTER-IP     EXTERNAL-IP   PORT(S)   AGE
+    kubernetes   ClusterIP   xx.xx.xx.xx    <none>        443/TCP   41h
+
+
