@@ -1,4 +1,4 @@
-# This repo is used for kubernetes learning
+# Kubernetes learning - Part 1
 
 ## Origin
 
@@ -8,10 +8,17 @@ Original Repository can be found [here](https://github.com/rinormaloku/k8s-maste
 
 ## What's new
 
-- Add kubernetes config at each repo (instead of gathering them)
-- Try to deploy on AWS EKS
-- Try advance features like logging or monitoring
-- Know how to develop at local
+- Know how to setup locally using microk8s (part 1)
+- Add kubernetes config at each repo (instead of gathering them) (part 1)
+- Try DNS instead of fixed ip (part 1)
+- Try to deploy on AWS EKS (part 2)
+- Try advance features like logging or monitoring (part 3)
+
+## Summary Steps
+
+* Application Demo: what we will build
+* Services Detail: closer look at each service
+* Bring kubernetes to your application
 
 ## Application Demo
 
@@ -35,7 +42,7 @@ This interaction is best illustrated by showing how the data flows between them:
 4. Python Application calculates the sentiment and returns the result as a response.
 5. The Spring WebApp returns the response to the React app. (Which then represents the information to the user.)
 
-## Check each service
+## Services Detail
 
 ### Front-end
 
@@ -377,3 +384,152 @@ The External-IP is in pending state (and don’t wait, as it’s not going to ch
 
 ### Deployments
 
+The Deployment resource automates the process of moving from one version of the application to the next, with zero downtime and in case of failures, it enables us to quickly roll back to the previous version.
+
+Before we continue let’s state what we want to achieve, as it will provide us with the overview that enables us to understand the manifest definition for the deployment resource. What we want is:
+
+* Two pods of the image sa-frontend
+* Zero Downtime deployments,
+* Pods labeled with app: sa-frontend so that the services get discovered by the Service sa-frontend-lb.
+
+Now, we will translate the requirements into a Deployment definition.
+
+#### Deployment Definition
+
+Take a look at sa-frontend-deployment.yaml
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment                                          # 1
+metadata:
+  name: sa-frontend
+  labels:
+    app: sa-frontend
+spec:
+  selector:
+    matchLabels:
+      app: sa-frontend
+  replicas: 2                                             # 2
+  minReadySeconds: 15
+  strategy:
+    type: RollingUpdate                                   # 3
+    rollingUpdate: 
+      maxUnavailable: 1                                   # 4
+      maxSurge: 1                                         # 5
+  template:
+    metadata:
+      labels:
+        app: sa-frontend                                  # 6
+    spec:
+      containers:
+        - image: localhost:32000/sa-frontend:registry
+          imagePullPolicy: Always                         # 7
+          name: sa-frontend
+          ports:
+            - containerPort: 80
+```
+
+* **Kind**: A deployment.
+* **Selector**: Pods matching the selector will be taken under the management of this deployment.
+* R**eplicas** is a property of the deployments Spec object that defines how many pods we want to run. So only 2.
+* **Type** specifies the strategy used in this deployment when moving from the current version to the next. The strategy RollingUpdate ensures Zero Downtime deployments.
+* **MaxUnavailable** is a property of the RollingUpdate object that specifies the maximum unavailable pods allowed (compared to the desired state) when doing a rolling update. For our deployment which has 2 replicas this means that after terminating one Pod, we would still have one pod running, this way keeping our application accessible.
+* **MaxSurge** is another property of the RollingUpdate object that defines the maximum amount of pods added to a deployment (compared to the desired state). For our deployment, this means that when moving to a new version we can add one pod, which adds up to 3 pods at the same time.
+* **Template**: specifies the pod template that the Deployment will use to create new pods. Most likely the resemblance with Pods struck you immediately.
+* **app**: sa-frontend the label to use for the pods created by this template.
+* **ImagePullPolicy** when set to Always, it will pull the container images on each redeployment.
+
+Run command
+
+```$ microk8s.kubectl apply -f sa-frontend/kubernetes/sa-frontend-deployment.yaml```
+
+You'd see output
+
+```deployment.apps/sa-frontend created```
+
+Verify running pods
+
+```
+$ microk8s.kubectl get pods
+NAME                           READY   STATUS    RESTARTS   AGE
+sa-frontend-69c7d67dbf-hwm74   1/1     Running   0          88m
+sa-frontend-69c7d67dbf-rt8hz   1/1     Running   0          88m
+```
+
+* Zero-Downtime deployment
+
+
+Assume we have new requirement, The developers shipped their code and provided us with the only thing we need, the container image sa-frontend-green. We the DevOps have to roll a Zero-Downtime deployment
+
+Edit the file *sa-frontend-deployment.yaml* by changing the container image to refer to the new image: *sa-frontend-green*. Save the changes as sa-frontend-deployment-green.yaml and execute the following command:
+
+```
+$ microk8s.kubectl apply -f sa-frontend-deployment-green.yaml --record
+deployment "sa-frontend" configured
+```
+
+We can check the status of the rollout using the following command:
+
+```
+kubectl rollout status deployment sa-frontend
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 old replicas are pending termination...
+Waiting for rollout to finish: 1 of 2 updated replicas are available...
+deployment "sa-frontend" successfully rolled out
+```
+
+According to the output the deployment was rolled out. It was done in such a fashion that the replicas were replaced one by one. Meaning that our application was always on
+
+* Rolling back to a previous state
+
+The new application has a critical bug, in PRODUCTION!! Revert back to the previous version immediately.
+
+```
+$ microk8s.kubectl rollout history deployment sa-frontend
+
+deployment.apps/sa-frontend 
+REVISION  CHANGE-CAUSE
+1         <none>
+2         kubectl apply --kubeconfig=/var/snap/microk8s/1173/credentials/client.config --filename=sa-frontend/kubernetes/sa-frontend-deployment-green.yaml --record=true
+```
+
+```
+$ microk8s.kubectl rollout undo deployment sa-frontend --to-revision=1
+deployment.apps/sa-frontend rolled back
+```
+
+At this time, you know how to deploy other services: sa-webapp and sa-logic but how services call each other ?
+
+Normally, we configure our single-base-service application using **.env**, **setting** or **config** file. For example we have a config for sa-webapp:
+
+```yaml
+# file .env
+SA_LOGIC_URL=sa-logic.abc.com
+SA_LOGIC_PORT=3306
+```
+
+Main entry will read config here and start connection to ```sa-logic.abc.com:3306```. In case we want to run a **test** environment with url as below:
+
+```yaml
+# file .env.test
+SA_LOGIC_URL=sa-logic-test.abc.com
+SA_LOGIC_PORT=3307
+```
+
+We can not modify **.env** for sa-webapp service manually. In kubernetes we use **ConfigMap** to do that. It's where we store all configurations in defferent environments for our app. The Pod will refer to the right values in run-time. 
+
+#### Setup ConfigMap
+
+
+
+
+Now, we go back to previous question:
+``` 
+Can services call each other, now ?
+```
+
+
+#### DNS

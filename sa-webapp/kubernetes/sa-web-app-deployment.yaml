@@ -21,7 +21,7 @@ spec:
         app: sa-web-app
     spec:
       containers:
-      - image: rinormaloku/sentiment-analysis-web-app
+      - image: localhost:32000/sa-webapp:registry
         imagePullPolicy: Always
         name: sa-web-app
         env:
