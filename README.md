@@ -14,6 +14,7 @@ Original Repository can be found [here](https://github.com/rinormaloku/k8s-maste
 - Try ConfigMap (part 2)
 - Try to deploy on AWS EKS (part 3)
 - Try advance features like logging or monitoring (part 3)
+- And more
 
 ## Summary Steps
 
@@ -653,5 +654,15 @@ Set this option to --address 0.0.0.0 to make the Dashboard public. For example:
 ```
 microk8s.kubectl port-forward -n kube-system service/kubernetes-dashboard 10443:443 --address 0.0.0.0
 ```
+
+## Conclusion
+
+In this part, we have done:
+
+* Install necessary tools for kubernetes developement
+* Cover some concepts of Kubernetes like: Pod, Service or Deployment
+* Migrate normal dockerized application to kubernetes-based application
+* Know how to register image at local registry
+* Monitor services using kubernetes dashboard
 
 See you in [part 2](./posts/PART2.md)
