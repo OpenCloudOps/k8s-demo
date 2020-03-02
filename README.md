@@ -431,7 +431,7 @@ spec:
 
 * **Kind**: A deployment.
 * **Selector**: Pods matching the selector will be taken under the management of this deployment.
-* R**eplicas** is a property of the deployments Spec object that defines how many pods we want to run. So only 2.
+* **Replicas** is a property of the deployments Spec object that defines how many pods we want to run. So only 2.
 * **Type** specifies the strategy used in this deployment when moving from the current version to the next. The strategy RollingUpdate ensures Zero Downtime deployments.
 * **MaxUnavailable** is a property of the RollingUpdate object that specifies the maximum unavailable pods allowed (compared to the desired state) when doing a rolling update. For our deployment which has 2 replicas this means that after terminating one Pod, we would still have one pod running, this way keeping our application accessible.
 * **MaxSurge** is another property of the RollingUpdate object that defines the maximum amount of pods added to a deployment (compared to the desired state). For our deployment, this means that when moving to a new version we can add one pod, which adds up to 3 pods at the same time.
@@ -501,35 +501,156 @@ $ microk8s.kubectl rollout undo deployment sa-frontend --to-revision=1
 deployment.apps/sa-frontend rolled back
 ```
 
-At this time, you know how to deploy other services: sa-webapp and sa-logic but how services call each other ?
+Let's deploy other services:
 
-Normally, we configure our single-base-service application using **.env**, **setting** or **config** file. For example we have a config for sa-webapp:
+* Deploy sa-logic pods
+
+```
+microk8s.kubectl apply -f sa-logic/kubernetes/sa-logic-deployment.yaml
+```
+
+* Deploy sa-logic service
+
+we need a Service that “acts as the entry point to a set of pods that provide the same functional service”. This means that we can use the Service SA-Logic as the entry point to all the SA-Logic pods.
+
+```
+microk8s.kubectl apply -f sa-logic/kubernetes/service-sa-logic.yaml
+```
+
+* Deploy sa-webapp pods
+
+```
+microk8s.kubectl apply -f sa-webapp/kubernetes/sa-web-app-deployment.yaml
+```
+
+* Deploy sa-webapp service
+
+```
+microk8s.kubectl apply -f sa-webapp/kubernetes/service-sa-web-app-lb.yaml
+```
+
+#### Verify running services and pods
+
+```
+$ microk8s.kubectl get svc
+NAME             TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+kubernetes       ClusterIP      10.152.183.1     <none>        443/TCP        5d20h
+sa-frontend-lb   LoadBalancer   10.152.183.213   <pending>     80:32171/TCP   3d21h
+sa-logic         ClusterIP      10.152.183.216   <none>        80/TCP         7m2s
+sa-web-app-lb    LoadBalancer   10.152.183.234   <pending>     80:31924/TCP   6s
+```
+
+```
+$ microk8s.kubectl get pod
+NAME                           READY   STATUS    RESTARTS   AGE
+sa-frontend-56f9dbd78d-76l9k   1/1     Running   0          3h36m
+sa-frontend-56f9dbd78d-7rwb4   1/1     Running   0          3h36m
+sa-logic-84cc884c67-n4lt9      1/1     Running   0          3h38m
+sa-logic-84cc884c67-wg8gb      1/1     Running   0          3h38m
+sa-web-app-69bbb67c75-ngfmw    1/1     Running   0          2m3s
+sa-web-app-69bbb67c75-tkfc2    1/1     Running   0          2m3s
+```
+
+
+At this time, you know how to deploy other services: sa-webapp and sa-logic but how services call each other ? We need answer why environment variable **SA_LOGIC_API_URL** can be resolved and **How sa-frontend call sa-webapp**
+
+*  Service IP address
+
+Kubernetes has a special pod the kube-dns. And by default, all Pods use it as the DNS Server. One important property of kube-dns is that it creates a DNS record for each created service.
+
+This means that when we created the service sa-logic it got an IP address. Its name was added as a record (in conjunction with the IP) in kube-dns. This enables all the pods to translate the sa-logic to the SA-Logic services IP address.
+
+* Get the SA-WebApp Loadbalancer IP
+
+```
+$ microk8s.kubectl get service
+NAME            TYPE           CLUSTER-IP       EXTERNAL-IP   PORT(S)        AGE
+sa-web-app-lb   LoadBalancer   10.152.183.234   <pending>     80:31924/TCP   15m
+```
+
+* Edit file **App.js**
+
+```javascript
+const wepAppURL = 'http://10.152.183.234:80/sentiment'
+
+class App extends Component {
+    ...
+
+    analyzeSentence() {
+        fetch(wepAppURL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({sentence: this.textField.getValue()})
+        })
+            .then(response => response.json())
+            .then(data => this.setState(data));
+    }
+  ...
+```
+
+* Rebuild image and push to registry
+
+```
+$ npm run build
+$ docker build -f Dockerfile -t localhost:32000/sa-frontend-2:registry .
+
+$ docker push localhost:32000/sa-frontend-2
+```
+
+* Edit deployment definition then Apply
 
 ```yaml
-# file .env
-SA_LOGIC_URL=sa-logic.abc.com
-SA_LOGIC_PORT=3306
-```
-
-Main entry will read config here and start connection to ```sa-logic.abc.com:3306```. In case we want to run a **test** environment with url as below:
-
-```yaml
-# file .env.test
-SA_LOGIC_URL=sa-logic-test.abc.com
-SA_LOGIC_PORT=3307
-```
-
-We can not modify **.env** for sa-webapp service manually. In kubernetes we use **ConfigMap** to do that. It's where we store all configurations in defferent environments for our app. The Pod will refer to the right values in run-time. 
-
-#### Setup ConfigMap
-
-
-
-
-Now, we go back to previous question:
-``` 
-Can services call each other, now ?
+containers:
+  - image: localhost:32000/sa-frontend-2:registry
 ```
 
 
-#### DNS
+```
+$ microk8s.kubectl apply -f sa-frontend/kubernetes/sa-frontend-deployment.yaml 
+```
+
+* Again, use port forward to access sa-frontend
+
+```
+sudo microk8s.kubectl port-forward sa-frontend-75b6f4bb4b-5l42x 9000:80
+```
+
+Now you can test application:
+
+![final](./docs/final.png)
+
+
+### Bonus: Dashboard
+
+The standard Kubernetes Dashboard is a convenient way to keep track of the activity and resource use of MicroK8s
+
+```microk8s.enable dashboard```
+
+To log in to the Dashboard, you will need the access token (unless RBAC has also been enabled). This is generated randomly on deployment, so a few commands are needed to retrieve it:
+
+```
+token=$(microk8s.kubectl -n kube-system get secret | grep default-token | cut -d " " -f1)
+microk8s.kubectl -n kube-system describe secret $token
+```
+
+Next, you need to connect to the dashboard service. While the MicroK8s snap will have an IP address on your local network (the Cluster IP of the kubernetes-dashboard service), you can also reach the dashboard by forwarding its port to a free one on your host with:
+
+```
+microk8s.kubectl port-forward -n kube-system service/kubernetes-dashboard 10443:443
+```
+
+You can then access the Dashboard at https://127.0.0.1:10443
+
+And voila:
+
+![Dashboard](./docs/Dashboard.png)
+
+Set this option to --address 0.0.0.0 to make the Dashboard public. For example:
+
+```
+microk8s.kubectl port-forward -n kube-system service/kubernetes-dashboard 10443:443 --address 0.0.0.0
+```
+
+See you in [part 2](./posts/PART2.md)

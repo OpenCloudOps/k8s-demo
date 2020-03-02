@@ -10,6 +10,12 @@ const style = {
     marginLeft: 12,
 };
 
+// use for normal docker environment
+// const wepAppURL = 'http://localhost:8080/sentiment'
+
+// use in kubernetes
+const wepAppURL = 'http://10.152.183.234:80/sentiment'
+
 class App extends Component {
     constructor(props) {
         super(props);
@@ -20,7 +26,7 @@ class App extends Component {
     };
 
     analyzeSentence() {
-        fetch('http://localhost:8080/sentiment', {
+        fetch(wepAppURL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'

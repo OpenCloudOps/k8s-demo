@@ -21,8 +21,11 @@ spec:
         app: sa-frontend                                  # 6
     spec:
       containers:
-        - image: localhost:32000/sa-frontend:registry
+        - image: localhost:32000/sa-frontend-2:registry
           imagePullPolicy: Always                         # 7
           name: sa-frontend
           ports:
             - containerPort: 80
+          env:
+            - name: SA_WEBAPP_URL
+              value: "http://sa-webapp"
