@@ -10,8 +10,9 @@ Original Repository can be found [here](https://github.com/rinormaloku/k8s-maste
 
 - Know how to setup locally using microk8s (part 1)
 - Add kubernetes config at each repo (instead of gathering them) (part 1)
-- Try DNS instead of fixed ip (part 1)
-- Try to deploy on AWS EKS (part 2)
+- Try DNS instead of fixed ip (part 2)
+- Try ConfigMap (part 2)
+- Try to deploy on AWS EKS (part 3)
 - Try advance features like logging or monitoring (part 3)
 
 ## Summary Steps
